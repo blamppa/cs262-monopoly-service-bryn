@@ -67,6 +67,9 @@ router.get('/players/:id', readPlayer);
 router.put('/players/:id', updatePlayer);
 router.post('/players', createPlayer);
 router.delete('/players/:id', deletePlayer);
+router.get('/games', readGames);
+router.get('/games/:id', readGame);
+router.delete('/games/:id', deleteGame);
 
 // For testing only; vulnerable to SQL injection!
 // router.get('/bad/players/:id', readPlayerBad);
@@ -138,6 +141,61 @@ function readPlayer(request: Request, response: Response, next: NextFunction): v
             next(error);
         });
 }
+/**
+ * Retrieves all games from the database.
+ */
+function readGames(_request: Request, response: Response, next: NextFunction): void {
+    db.manyOrNone('SELECT * FROM Game')
+        .then((data): void => {
+            // data is a list, never null
+            response.send(data);
+        })
+        .catch((error: Error): void => {
+            next(error);
+        });
+}
+
+/**
+ * Retrieves a specific game's info (e.g., name and total score).
+ * Adjust the SELECT to match whatever your homework asks for.
+ */
+function readGame(request: Request, response: Response, next: NextFunction): void {
+    db.oneOrNone(
+        `SELECT g.id,
+                g.name,
+                SUM(pg.score) AS score
+         FROM Game g
+         LEFT JOIN PlayerGame pg ON g.id = pg.gameID
+         WHERE g.id = \${id}
+         GROUP BY g.id, g.name`,
+        request.params
+    )
+        .then((data): void => {
+            returnDataOr404(response, data);
+        })
+        .catch((error: Error): void => {
+            next(error);
+        });
+}
+
+/**
+ * Deletes a game and its related PlayerGame rows.
+ */
+function deleteGame(request: Request, response: Response, next: NextFunction): void {
+    db.tx((t) => {
+        return t.none('DELETE FROM PlayerGame WHERE gameID=${id}', request.params)
+            .then(() => {
+                return t.oneOrNone('DELETE FROM Game WHERE id=${id} RETURNING id', request.params);
+            });
+    })
+        .then((data): void => {
+            returnDataOr404(response, data);
+        })
+        .catch((error: Error): void => {
+            next(error);
+        });
+}
+
 
 /**
  * This function is intentionally vulnerable to SQL injection attacks because it:
