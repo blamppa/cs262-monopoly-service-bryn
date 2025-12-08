@@ -141,6 +141,7 @@ function readPlayer(request: Request, response: Response, next: NextFunction): v
             next(error);
         });
 }
+
 /**
  * Retrieves all games from the database.
  */
@@ -156,22 +157,25 @@ function readGames(_request: Request, response: Response, next: NextFunction): v
 }
 
 /**
- * Retrieves a specific game's info (e.g., name and total score).
- * Adjust the SELECT to match whatever your homework asks for.
+ * Retrieves all players (name + score) for a specific game.
  */
 function readGame(request: Request, response: Response, next: NextFunction): void {
-    db.oneOrNone(
-        `SELECT g.id,
-                g.name,
-                SUM(pg.score) AS score
-         FROM Game g
-         LEFT JOIN PlayerGame pg ON g.id = pg.gameID
-         WHERE g.id = \${id}
-         GROUP BY g.id, g.name`,
+    db.manyOrNone(
+        `SELECT p.id,
+                p.name,
+                pg.score
+         FROM PlayerGame AS pg
+         JOIN Player AS p ON pg.playerID = p.id
+         WHERE pg.gameID = \${id}
+         ORDER BY pg.score DESC`,
         request.params
     )
         .then((data): void => {
-            returnDataOr404(response, data);
+            if (!data || data.length === 0) {
+                response.sendStatus(404);
+            } else {
+                response.send(data);
+            }
         })
         .catch((error: Error): void => {
             next(error);
